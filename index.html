@@ -6,13 +6,12 @@
     <title>Seating Assignment</title>
     <style>
         body { font-family: Arial, sans-serif; }
-        .container { max-width: 1000px; margin: 0 auto; display: flex; }
+        .container { max-width: 1200px; margin: 0 auto; display: flex; }
         label, input, button { display: block; margin: 10px 0; }
-        #seating-chart { margin-top: 20px; }
-        #extra { margin-top: 20px; }
-        .shortcut-table { margin-left: 50px; }
-        table { border-collapse: collapse; width: 200px; }
-        table, th, td { border: 1px solid black; padding: 5px; }
+        table { border-collapse: collapse; width: 300px; margin-top: 20px; }
+        table, th, td { border: 1px solid black; padding: 5px; text-align: center; }
+        .schedule-table { margin-top: 30px; width: 100%; }
+        th { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
@@ -22,18 +21,18 @@
 
             <!-- Input for name management -->
             <label for="newName">Add New Name:</label>
-            <input type="text" id="newName" onkeydown="if (event.key === 'Enter') addName()">
+            <input type="text" id="newName">
             <button onclick="addName()">Add Name</button>
             <button onclick="removeSelectedName()">Remove Selected Name</button>
-
-            <!-- Pregnant group management -->
-            <label for="pregnantName">Add Pregnant Person:</label>
-            <input type="text" id="pregnantName" onkeydown="if (event.key === 'Enter') addPregnant()">
-            <button onclick="addPregnant()">Add Pregnant</button>
 
             <!-- List of names -->
             <h3>Name Pool:</h3>
             <select id="nameList" size="10" style="width: 200px;"></select>
+
+            <!-- Pregnant group management -->
+            <label for="pregnantName">Add Pregnant Person:</label>
+            <input type="text" id="pregnantName">
+            <button onclick="addPregnant()">Add Pregnant</button>
 
             <!-- Pregnant group list -->
             <h3>Pregnant Group:</h3>
@@ -41,45 +40,51 @@
 
             <!-- Seat 1 specific name -->
             <label for="seat1">Specific Person for Seat 1:</label>
-            <input type="text" id="seat1" onkeydown="if (event.key === 'Enter') assignSeats()">
+            <input type="text" id="seat1">
 
             <!-- Restricted pair -->
             <h3>Restricted Pair (Should not sit next to each other):</h3>
-            <input type="text" id="name1" placeholder="First name" onkeydown="if (event.key === 'Enter') assignSeats()">
-            <input type="text" id="name2" placeholder="Second name" onkeydown="if (event.key === 'Enter') assignSeats()">
+            <input type="text" id="name1" placeholder="First name">
+            <input type="text" id="name2" placeholder="Second name">
 
-            <!-- Button to assign seats -->
-            <button onclick="assignSeats()">Assign Seats</button>
+            <!-- Button to assign shifts -->
+            <button onclick="assignShift()">Assign Shift</button>
 
             <!-- Seating chart display -->
             <div id="seating-chart">
-                <h3>Seating Chart:</h3>
-                <div id="seatingResult"></div>
-            </div>
-
-            <!-- Extra people display -->
-            <div id="extra">
-                <h3>People Without Seats (Standing):</h3>
-                <div id="extraResult"></div>
+                <h3>Generated Schedule:</h3>
+                <table class="schedule-table">
+                    <thead>
+                        <tr>
+                            <th>Generation</th>
+                            <th>Shift</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scheduleBody">
+                        <!-- Generated shifts will be populated here -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
         <!-- Shortcut table -->
-        <div class="shortcut-table">
+        <div style="margin-left: 50px;">
             <h3>Shortcut Table</h3>
             <table>
                 <thead>
                     <tr>
-                        <th>Number</th>
+                        <th>Position</th>
                         <th>Name</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="shortcutTable">
                     <!-- Shortcut entries will be populated here -->
                 </tbody>
             </table>
+
             <label for="shortcutName">Add Name to Shortcut:</label>
-            <input type="text" id="shortcutName" onkeydown="if (event.key === 'Enter') addShortcut()">
+            <input type="text" id="shortcutName">
             <button onclick="addShortcut()">Add Shortcut</button>
         </div>
     </div>

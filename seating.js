@@ -4,15 +4,47 @@ let assignedSeats = {};
 let extraPeople = [];
 let shortcuts = {};
 let shortcutCounter = 1; // Start numbering from 1
+let schedule = [];
+let restrictedPair = { name1: "", name2: "" };
 
-// Add a name to the pool
+// Load saved shortcuts from localStorage
+window.onload = function () {
+    const savedShortcuts = localStorage.getItem('shortcuts');
+    if (savedShortcuts) {
+        shortcuts = JSON.parse(savedShortcuts);
+        shortcutCounter = Math.max(...Object.keys(shortcuts)) + 1; // Set shortcutCounter to the next available number
+        updateShortcutTable();
+    }
+};
+
+// Add a name to the pool and display in the list
 function addName() {
     const newName = document.getElementById('newName').value;
     if (newName) {
-        namePool.push({ name: newName, isPregnant: false });
+        namePool.push(newName);
         updateNameList();
         document.getElementById('newName').value = ''; // Clear input
     }
+}
+
+// Remove selected name from the pool
+function removeSelectedName() {
+    const select = document.getElementById('nameList');
+    if (select.selectedIndex > -1) {
+        namePool.splice(select.selectedIndex, 1); // Remove selected item from namePool
+        updateNameList();
+    }
+}
+
+// Update the name pool list UI
+function updateNameList() {
+    const select = document.getElementById('nameList');
+    select.innerHTML = ''; // Clear current list
+    namePool.forEach(name => {
+        let option = document.createElement('option');
+        option.text = name;
+        select.add(option);
+    });
 }
 
 // Add a name to the pregnant group
@@ -23,26 +55,6 @@ function addPregnant() {
         updatePregnantList();
         document.getElementById('pregnantName').value = ''; // Clear input
     }
-}
-
-// Remove selected name
-function removeSelectedName() {
-    const select = document.getElementById('nameList');
-    if (select.selectedIndex > -1) {
-        namePool.splice(select.selectedIndex, 1); // Remove selected item from namePool
-        updateNameList();
-    }
-}
-
-// Update the name list UI
-function updateNameList() {
-    const select = document.getElementById('nameList');
-    select.innerHTML = ''; // Clear current list
-    namePool.forEach(person => {
-        let option = document.createElement('option');
-        option.text = person.name;
-        select.add(option);
-    });
 }
 
 // Update the pregnant group list UI
@@ -63,100 +75,163 @@ function addShortcut() {
         shortcuts[shortcutCounter] = name;
         shortcutCounter++; // Increment counter for the next shortcut
         updateShortcutTable();
+        saveShortcuts(); // Save to localStorage
         document.getElementById('shortcutName').value = ''; // Clear input
     }
 }
 
-// Update the shortcut table UI
+// Update the shortcut table UI and enable manual changes
 function updateShortcutTable() {
     const table = document.getElementById('shortcutTable');
     table.innerHTML = ''; // Clear current shortcuts
     for (let number in shortcuts) {
-        const row = `<tr><td>${number}</td><td>${shortcuts[number]}</td></tr>`;
+        const row = `<tr>
+                        <td><input type="number" value="${number}" onchange="changeShortcutPosition(${number}, this.value)"></td>
+                        <td><input type="text" value="${shortcuts[number]}" onchange="changeShortcutName(${number}, this.value)"></td>
+                        <td><button onclick="deleteShortcut(${number})">Delete</button></td>
+                     </tr>`;
         table.innerHTML += row;
     }
 }
 
-// Assign seats based on the rules and shortcuts
-function assignSeats() {
+// Save shortcuts to localStorage
+function saveShortcuts() {
+    localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
+}
+
+// Change the position of the shortcut manually
+function changeShortcutPosition(oldNumber, newNumber) {
+    if (shortcuts[newNumber]) {
+        alert('This position is already taken.');
+        return;
+    }
+    shortcuts[newNumber] = shortcuts[oldNumber];
+    delete shortcuts[oldNumber];
+    updateShortcutTable();
+    saveShortcuts(); // Save updated table
+}
+
+// Change the name of the shortcut manually
+function changeShortcutName(number, newName) {
+    shortcuts[number] = newName;
+    updateShortcutTable();
+    saveShortcuts(); // Save updated table
+}
+
+// Delete a shortcut manually
+function deleteShortcut(number) {
+    delete shortcuts[number];
+    updateShortcutTable();
+    saveShortcuts(); // Save updated table
+}
+
+// Assign a shift for generation
+function assignShift() {
     const seat1Name = document.getElementById('seat1').value;
-    const restrictedPair = {
-        name1: document.getElementById('name1').value,
-        name2: document.getElementById('name2').value
-    };
+    const name1 = document.getElementById('name1').value;
+    const name2 = document.getElementById('name2').value;
 
-    // Clear previous seating assignment
-    assignedSeats = {};
-    extraPeople = [];
+    restrictedPair = { name1, name2 }; // Set restricted pair
+    const shiftSeats = generateShift(seat1Name);
+    updateSchedule(shiftSeats);
+}
 
-    // Handle seat 1 assignment if specific person is selected
-    if (seat1Name && shortcuts[seat1Name]) {
-        assignedSeats[1] = { name: shortcuts[seat1Name], isPregnant: false };
-        namePool = namePool.filter(p => p.name !== assignedSeats[1].name); // Remove from pool
+// Generate seat assignments
+function generateShift(seat1Name) {
+    let shiftSeats = {};
+    let remainingPeople = [...namePool];
+
+    // Assign seat 1 if a specific name is selected
+    if (seat1Name) {
+        shiftSeats[1] = { name: seat1Name };
+        remainingPeople = remainingPeople.filter(p => p !== seat1Name); // Remove seat 1 person from the pool
     }
 
-    // Assign pregnant group to seats 9-12, but normal names can also be in those seats
+    // Pregnant group seating in seats 9-12
     for (let i = 12; i >= 9; i--) {
         if (pregnantGroup.length > 0) {
-            assignedSeats[i] = pregnantGroup.shift();
+            shiftSeats[i] = pregnantGroup.shift();
         }
     }
 
-    // Randomly assign remaining people to other seats
-    let remainingPeople = [...namePool];
+    // Assign the remaining people to seats, ensuring the restricted pair rule is respected
     for (let i = 1; i <= 12; i++) {
-        if (!assignedSeats[i] && remainingPeople.length > 0) {
+        if (!shiftSeats[i] && remainingPeople.length > 0) {
             const randomIndex = Math.floor(Math.random() * remainingPeople.length);
-            assignedSeats[i] = remainingPeople[randomIndex];
+            const person = remainingPeople[randomIndex];
+
+            // Ensure restricted pair are not next to each other
+            if (
+                (shiftSeats[i - 1] && shiftSeats[i - 1].name === restrictedPair.name1 && person === restrictedPair.name2) ||
+                (shiftSeats[i - 1] && shiftSeats[i - 1].name === restrictedPair.name2 && person === restrictedPair.name1)
+            ) {
+                continue; // Skip this person and try again
+            }
+
+            shiftSeats[i] = { name: person };
             remainingPeople.splice(randomIndex, 1); // Remove from pool
         }
     }
-
-    // People without seats (standing)
-    extraPeople = remainingPeople;
-
-    // Validate that restricted pair is not seated next to each other
-    validateNoAdjacentRestrictions(restrictedPair);
-
-    // Display the seating chart and extra people
-    displaySeatingChart();
-    displayExtraPeople();
+    return shiftSeats;
 }
 
-// Validate no restricted pair is seated next to each other
-function validateNoAdjacentRestrictions(restrictedPair) {
-    for (let i = 1; i <= 11; i++) {
-        if (assignedSeats[i] && assignedSeats[i + 1]) {
-            if ((assignedSeats[i].name === restrictedPair.name1 && assignedSeats[i + 1].name === restrictedPair.name2) ||
-                (assignedSeats[i].name === restrictedPair.name2 && assignedSeats[i + 1].name === restrictedPair.name1)) {
-                // Handle this case, perhaps swap with another seat
-                alert(`Error: ${restrictedPair.name1} and ${restrictedPair.name2} cannot sit next to each other.`);
-                return false;
-            }
+// Update the schedule with the generated shift
+function updateSchedule(shiftSeats) {
+    schedule.push(shiftSeats);
+    displaySchedule();
+}
+
+// Display the seating chart for all generated shifts
+function displaySchedule() {
+    const scheduleBody = document.getElementById('scheduleBody');
+    scheduleBody.innerHTML = ''; // Clear the current schedule
+
+    schedule.forEach((shiftSeats, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>Generation ${index + 1}</td>
+            <td>${formatShift(shiftSeats)}</td>
+        `;
+        scheduleBody.appendChild(row);
+    });
+}
+
+// Format the shift to display seat assignments nicely using names from shortcuts
+function formatShift(shiftSeats) {
+    let result = '';
+    for (let i = 1; i <= 12; i++) {
+        const person = shiftSeats[i];
+        if (person) {
+            const name = shortcuts[person.name] || person.name; // Use the name from shortcut, if available
+            result += `Seat ${i}: ${name}<br>`;
+        } else {
+            result += `Seat ${i}: Empty<br>`;
         }
     }
-    return true;
+    return result;
 }
 
-// Display seating chart result
-function displaySeatingChart() {
-    const seatingResult = document.getElementById('seatingResult');
-    seatingResult.innerHTML = ''; // Clear previous results
-    for (let i = 1; i <= 12; i++) {
-        const seatInfo = assignedSeats[i] ? assignedSeats[i].name : 'Empty';
-        seatingResult.innerHTML += `<p>Seat ${i}: ${seatInfo}</p>`;
-    }
-}
+// Handle "Enter" keypress events
+document.getElementById('newName').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') addName();
+});
 
-// Display people without seats (standing)
-function displayExtraPeople() {
-    const extraResult = document.getElementById('extraResult');
-    extraResult.innerHTML = ''; // Clear previous results
-    if (extraPeople.length > 0) {
-        extraPeople.forEach(person => {
-            extraResult.innerHTML += `<p>${person.name}</p>`;
-        });
-    } else {
-        extraResult.innerHTML += `<p>No extra people. Everyone has a seat.</p>`;
-    }
-}
+document.getElementById('pregnantName').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') addPregnant();
+});
+
+document.getElementById('seat1').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') assignShift();
+});
+
+document.getElementById('name1').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') assignShift();
+});
+
+document.getElementById('name2').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') assignShift();
+});
+
+document.getElementById('shortcutName').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') addShortcut();
+});
